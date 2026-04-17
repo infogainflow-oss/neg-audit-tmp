@@ -1,0 +1,125 @@
+{
+  "name": "BACKFILL - Stale Docs to NEG_v4",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- SMOKE TEST first (LIMIT 3). Remove LIMIT for full run.\nSELECT\n  internal_number,\n  content,\n  table_blocks,\n  metadata,\n  qdrant_collection AS old_collection\nFROM documents\nWHERE qdrant_collection != 'NEG_v4' OR qdrant_collection IS NULL\nORDER BY processed_at ASC\nLIMIT 3;",
+        "options": {}
+      },
+      "id": "pg-select",
+      "name": "1. Select Stale Docs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [420, 400],
+      "credentials": {
+        "postgres": {
+          "id": "j9xrEmElU55qnKWk",
+          "name": "NEG RAG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Reshape PG row → S-02 input shape.\n * S-02 expects: { text, tableBlocks, metadata }\n * PG `content` is already the assembled OCR text (S-02 will rebuild content from it).\n * PG `metadata` JSONB is camelCase and matches S-02's expected metadata.\n */\nreturn $input.all().map(item => {\n  const d = item.json;\n  const meta = d.metadata || {};\n  // Ensure required defaults\n  meta.workflowVersion = 'v5-phase-b-v2-backfill';\n  return {\n    json: {\n      text: d.content || '',\n      tableBlocks: Array.isArray(d.table_blocks) ? d.table_blocks : [],\n      metadata: meta,\n      _backfill: {\n        internal_number: d.internal_number,\n        old_collection: d.old_collection\n      }\n    }\n  };\n});"
+      },
+      "id": "reshape",
+      "name": "2. Reshape for S-02",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 400]
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        },
+        "batchSize": 5
+      },
+      "id": "loop",
+      "name": "3. Loop (batch=5)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [860, 400]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "kJVJmTbeXkga0nap",
+          "mode": "list",
+          "cachedResultName": "S-02 RAG Ingestion Service (Phase B v2)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "call-s02",
+      "name": "4. Call S-02",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [1080, 320],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "wait",
+      "name": "5. Throttle 3s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1300, 320],
+      "webhookId": "backfill-throttle"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Aggregate per-doc result for the run summary.\n */\nconst results = $input.all().map(item => {\n  const j = item.json || {};\n  return {\n    internal_number: j.internalNumber || j._backfill?.internal_number || null,\n    success: j.success === true,\n    chunks: j.chunksIngested || 0,\n    strategy: j.strategy || null,\n    collection: j.collection || null,\n    error: j.error || j.postgresError || null\n  };\n});\nconst summary = {\n  total: results.length,\n  succeeded: results.filter(r => r.success).length,\n  failed: results.filter(r => !r.success).length,\n  total_chunks: results.reduce((s, r) => s + (r.chunks || 0), 0)\n};\nreturn [{ json: { summary, results } }];"
+      },
+      "id": "summary",
+      "name": "6. Final Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 560]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "1. Select Stale Docs", "type": "main", "index": 0 }]]
+    },
+    "1. Select Stale Docs": {
+      "main": [[{ "node": "2. Reshape for S-02", "type": "main", "index": 0 }]]
+    },
+    "2. Reshape for S-02": {
+      "main": [[{ "node": "3. Loop (batch=5)", "type": "main", "index": 0 }]]
+    },
+    "3. Loop (batch=5)": {
+      "main": [
+        [{ "node": "6. Final Summary", "type": "main", "index": 0 }],
+        [{ "node": "4. Call S-02", "type": "main", "index": 0 }]
+      ]
+    },
+    "4. Call S-02": {
+      "main": [[{ "node": "5. Throttle 3s", "type": "main", "index": 0 }]]
+    },
+    "5. Throttle 3s": {
+      "main": [[{ "node": "3. Loop (batch=5)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}
