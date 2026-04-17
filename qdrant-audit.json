@@ -1,0 +1,133 @@
+{
+  "name": "AUDIT - Qdrant Collections",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://qdrant:6333/collections",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "options": {}
+      },
+      "id": "list-collections",
+      "name": "1. List Collections",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 400],
+      "credentials": {
+        "qdrantApi": {
+          "id": "zju2plKGdShb8Mea",
+          "name": "QdrantApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://qdrant:6333/collections/NEG_v4",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "options": {}
+      },
+      "id": "info-v4",
+      "name": "2. NEG_v4 Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 200],
+      "credentials": {
+        "qdrantApi": {
+          "id": "zju2plKGdShb8Mea",
+          "name": "QdrantApi account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://qdrant:6333/collections/NEG_v3",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "options": {}
+      },
+      "id": "info-v3",
+      "name": "3. NEG_v3 Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 360],
+      "credentials": {
+        "qdrantApi": {
+          "id": "zju2plKGdShb8Mea",
+          "name": "QdrantApi account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://qdrant:6333/collections/NEG_v2",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "options": {}
+      },
+      "id": "info-v2",
+      "name": "4. NEG_v2 Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 520],
+      "credentials": {
+        "qdrantApi": {
+          "id": "zju2plKGdShb8Mea",
+          "name": "QdrantApi account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://qdrant:6333/collections/NEG_query_cache",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi",
+        "options": {}
+      },
+      "id": "info-cache",
+      "name": "5. NEG_query_cache Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 680],
+      "credentials": {
+        "qdrantApi": {
+          "id": "zju2plKGdShb8Mea",
+          "name": "QdrantApi account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[
+        { "node": "1. List Collections", "type": "main", "index": 0 }
+      ]]
+    },
+    "1. List Collections": {
+      "main": [[
+        { "node": "2. NEG_v4 Info", "type": "main", "index": 0 },
+        { "node": "3. NEG_v3 Info", "type": "main", "index": 0 },
+        { "node": "4. NEG_v2 Info", "type": "main", "index": 0 },
+        { "node": "5. NEG_query_cache Info", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}
